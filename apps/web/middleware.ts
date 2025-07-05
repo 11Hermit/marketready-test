@@ -194,6 +194,23 @@ function getPatterns() {
             new URL(pathsConfig.auth.verifyMfa, origin).href,
           );
         }
+
+        // --- Onboarding redirect logic ---
+        // Fetch the user's profile to check onboarding completion
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('hasCompletedOnboarding')
+          .eq('id', user.id)
+          .single();
+
+        if (!profileError && profileData && !profileData.hasCompletedOnboarding) {
+          // Prevent redirect loop if already on onboarding page
+          if (!req.nextUrl.pathname.startsWith(pathsConfig.app.onboarding)) {
+            return NextResponse.redirect(
+              new URL(pathsConfig.app.onboarding, origin).href
+            );
+          }
+        }
       },
     },
   ];

@@ -1,29 +1,57 @@
-# MarketReady.ai – AI-Powered Real-Estate SaaS Platform
+# MarketReady.ai
 
-MarketReady.ai leverages Makerkit Pro Turbo under the hood and adds a suite of AI productivity tools designed specifically for real-estate professionals.
+**AI-powered SaaS platform for real estate professionals**
 
-Stage 1 delivers the foundation: authentication, onboarding, dashboards, billing and an extendable "Tool Loader" ready for rapid AI-tool deployment.
+---
 
-### Prerequisites
+MarketReady.ai is a modern, extensible SaaS platform built for real estate teams and agents. It features robust authentication, a beautiful onboarding wizard, a responsive dashboard, and a foundation for rapid AI tool deployment.
 
-* Node >= 18 (use `.nvmrc`)
-* pnpm >= 8 _(preferred)_ or npm
-* Supabase project (free tier is fine)
-* Stripe account (test mode)
+## Features
+- **Modern Onboarding Flow:** Multi-step wizard for new users (personal info, business info, integrations)
+- **Secure Authentication:** Email/password, email verification, terms acceptance, session management
+- **Responsive Dashboard:** Sidebar navigation, AI command bar, notifications, tool categories, and favorites
+- **Billing Ready:** Stripe integration (test mode)
+- **Supabase Backend:** Secure, scalable, with row-level security
+- **Developer Friendly:** TurboRepo, Next.js 15, TypeScript, Tailwind, Shadcn UI
 
-### Local setup
-
-```bash
-pnpm install
-cp .env.example .env.local   # fill Supabase + Stripe keys
-pnpm dev                      # starts all apps via Turbo
+## Project Structure
+```
+/apps/web/
+  /app
+    /onboarding      # Multi-step onboarding wizard
+    /home            # Dashboard and app shell
+      /(user)        # Personal workspace
+      /[account]     # Team workspace
+    /(marketing)     # Marketing pages
+    /auth            # Auth pages
+  /components        # Global components
+  /config            # App and navigation config
+  /lib               # Utilities
+  /supabase          # Supabase client/root
 ```
 
-Open `http://localhost:3000` and create an account to walk through the onboarding flow.
+## Getting Started
 
-[Please follow the documentation to get started](https://makerkit.dev/docs/next-supabase-turbo/introduction).
+### Prerequisites
+- Node.js >= 18 (see `.nvmrc`)
+- pnpm >= 8 (preferred)
+- Supabase project (free tier is fine)
+- Stripe account (for billing features)
 
-**Please remember to update the repository daily**.
+### Local Development
+```sh
+pnpm install
+cp .env.example .env.local    # Add your Supabase/Stripe keys
+pnpm dev                      # Start all apps
+```
+Visit [http://localhost:3000](http://localhost:3000) and create an account to experience the onboarding flow and dashboard.
+
+## Contributing
+- All changes should be committed to the main branch.
+- **/docs** is ignored from git to avoid pushing internal PRDs or notes.
+
+## License
+This project is based on Makerkit Pro Turbo but is fully rebranded and extended for MarketReady.ai. See LICENSE for details.
 
 ## Getting Started
 

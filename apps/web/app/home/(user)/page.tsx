@@ -16,17 +16,10 @@ export const generateMetadata = async () => {
   };
 };
 
-function UserHomePage() {
-  return (
-    <>
-      <HomeLayoutPageHeader
-        title={<Trans i18nKey={'common:routes.home'} />}
-        description={<Trans i18nKey={'common:homeTabDescription'} />}
-      />
+import Dashboard from './dashboard';
 
-      <PageBody></PageBody>
-    </>
-  );
+function UserHomePage() {
+  return <Dashboard />;
 }
 
 export default withI18n(UserHomePage);

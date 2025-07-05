@@ -43,6 +43,7 @@ const pathsConfig = PathsSchema.parse({
     accountMembers: `/home/[account]/members`,
     accountBillingReturn: `/home/[account]/billing/return`,
     joinTeam: '/join',
+    onboarding: '/onboarding',
   },
 } satisfies z.infer<typeof PathsSchema>);
 
