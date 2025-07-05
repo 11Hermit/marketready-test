@@ -28,7 +28,7 @@ function Home() {
         <Hero
           pill={
             <Pill label={'New'}>
-              <span>The SaaS Starter Kit for ambitious developers</span>
+              <span>AI Tools for Real Estate Agents</span>
               <PillActionButton asChild>
                 <Link href={'/auth/sign-up'}>
                   <ArrowRightIcon className={'h-4 w-4'} />
@@ -38,14 +38,14 @@ function Home() {
           }
           title={
             <>
-              <span>The ultimate SaaS Starter</span>
-              <span>for your next project</span>
+              <span>MarketReady.ai</span>
+              <span>for Real Estate Agents</span>
             </>
           }
           subtitle={
             <span>
-              Build and Ship a SaaS faster than ever before with the next-gen
-              SaaS Starter Kit. Ship your SaaS in days, not months.
+              Streamline property marketing with AI-powered tools—
+              reach more buyers and tenants in minutes, not days.
             </span>
           }
           cta={<MainCallToActionButton />}
@@ -72,12 +72,12 @@ function Home() {
             heading={
               <>
                 <b className="font-medium tracking-tighter dark:text-white">
-                  The ultimate SaaS Starter Kit
+                  All your AI tools in one place
                 </b>
                 .{' '}
                 <span className="text-muted-foreground font-normal tracking-tighter">
                   Unleash your creativity and build your SaaS faster than ever
-                  with Makerkit.
+                  inside MarketReady.ai.
                 </span>
               </>
             }
@@ -92,13 +92,13 @@ function Home() {
               <FeatureCard
                 className={'relative col-span-1 overflow-hidden'}
                 label={'Beautiful Dashboard'}
-                description={`Makerkit provides a beautiful dashboard to manage your SaaS business.`}
+                description={`MarketReady.ai provides a beautiful dashboard to manage your property marketing tools.`}
               ></FeatureCard>
 
               <FeatureCard
                 className={'relative col-span-1 w-full overflow-hidden'}
                 label={'Authentication'}
-                description={`Makerkit provides a variety of providers to allow your users to sign in.`}
+                description={`Secure authentication powered by Supabase lets you access your tools with confidence.`}
               ></FeatureCard>
 
               <FeatureCard
@@ -110,13 +110,13 @@ function Home() {
               <FeatureCard
                 className={'relative col-span-1 overflow-hidden md:col-span-2'}
                 label={'Billing'}
-                description={`Makerkit supports multiple payment gateways to charge your customers.`}
+                description={`Stripe-powered billing keeps your subscription and invoices simple.`}
               />
 
               <FeatureCard
                 className={'relative col-span-1 overflow-hidden'}
                 label={'Plugins'}
-                description={`Extend your SaaS with plugins that you can install using the CLI.`}
+                description={`Connect upcoming AI tools and integrations as we release them.`}
               />
             </FeatureGrid>
           </FeatureShowcase>
