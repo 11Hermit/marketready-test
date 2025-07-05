@@ -196,20 +196,33 @@ function getPatterns() {
         }
 
         // --- Onboarding redirect logic ---
-        // Fetch the user's profile to check onboarding completion
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('hasCompletedOnboarding')
-          .eq('id', user.id)
-          .single();
+        // Skip onboarding check for the onboarding page itself
+        if (req.nextUrl.pathname === pathsConfig.app.onboarding) {
+          return;
+        }
 
-        if (!profileError && profileData && !profileData.hasCompletedOnboarding) {
-          // Prevent redirect loop if already on onboarding page
-          if (!req.nextUrl.pathname.startsWith(pathsConfig.app.onboarding)) {
-            return NextResponse.redirect(
-              new URL(pathsConfig.app.onboarding, origin).href
-            );
-          }
+        // Define the account data type
+        type AccountData = {
+          public_data: {
+            has_completed_onboarding?: boolean;
+            [key: string]: unknown;
+          };
+        };
+
+        // Fetch the user's account to check onboarding completion
+        const { data: accountData, error: accountError } = await supabase
+          .from('accounts')
+          .select('public_data')
+          .eq('primary_owner_user_id', user.id)
+          .eq('is_personal_account', true)
+          .single<AccountData>();
+
+        // If there's no account data or onboarding is not completed, redirect to onboarding
+        const hasCompletedOnboarding = accountData?.public_data?.has_completed_onboarding === true;
+        if ((!accountError && accountData && !hasCompletedOnboarding) || accountError) {
+          return NextResponse.redirect(
+            new URL(pathsConfig.app.onboarding, origin).href
+          );
         }
       },
     },

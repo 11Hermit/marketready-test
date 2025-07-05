@@ -1,188 +1,259 @@
-// MarketReady.ai Onboarding Wizard Page
 'use client';
 
 import { useState } from 'react';
-import { z } from 'zod';
-import { useForm, FormProvider } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { cn } from '~/lib/utils';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 import { Button } from '@kit/ui/button';
-import { Progress } from '@kit/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@kit/ui/card';
 import { Input } from '@kit/ui/input';
-import { useRouter } from 'next/navigation';
-import { Heading } from '@kit/ui/heading';
-import { Trans } from 'react-i18next';
-import { AppLogo } from '~/components/app-logo';
+import { Label } from '@kit/ui/label';
 
-// --- Step Schemas ---
-const PersonalInfoSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  company: z.string().optional(),
-  profilePicture: z.string().optional(),
-});
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-const BusinessInfoSchema = z.object({
-  propertyType: z.string().min(1, 'Property type is required'),
-  state: z.string().min(1, 'State is required'),
-  timezone: z.string().optional(),
-});
+// Simple class name utility
+function cn(...classes: (string | boolean | undefined)[]) {
+  return classes.filter(Boolean).join(' ');
+}
 
-const IntegrationSetupSchema = z.object({
-  rpDataApiKey: z.string().optional(),
-  canvaApiKey: z.string().optional(),
-});
-
-const steps = [
-  {
-    label: 'Personal Info',
-    schema: PersonalInfoSchema,
-  },
-  {
-    label: 'Business Info',
-    schema: BusinessInfoSchema,
-  },
-  {
-    label: 'Integrations',
-    schema: IntegrationSetupSchema,
-  },
-];
-
-const totalSteps = steps.length;
+type FormData = {
+  firstName: string;
+  lastName: string;
+  company: string;
+  propertyType: string;
+  state: string;
+  timezone: string;
+  rpDataApiKey: string;
+  canvaApiKey: string;
+};
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [completed, setCompleted] = useState(false);
-  const [formData, setFormData] = useState({});
-
-  // Compose all schemas for final validation
-  const FullSchema = PersonalInfoSchema.merge(BusinessInfoSchema).merge(IntegrationSetupSchema);
-
-  const methods = useForm({
-    resolver: zodResolver(steps[step].schema),
-    defaultValues: formData,
-    mode: 'onChange',
+  const [formData, setFormData] = useState<FormData>({
+    firstName: '',
+    lastName: '',
+    company: '',
+    propertyType: '',
+    state: '',
+    timezone: '',
+    rpDataApiKey: '',
+    canvaApiKey: ''
   });
 
-  const onSubmit = async (data: any) => {
-    // Save progress for this step
-    setFormData((prev) => ({ ...prev, ...data }));
-    if (step < totalSteps - 1) {
-      setStep(step + 1);
-    } else {
-      // Final submit: validate all data
-      const result = FullSchema.safeParse({ ...formData, ...data });
-      if (!result.success) {
-        // Should not happen, but just in case
-        return;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const nextStep = () => setStep(prev => Math.min(prev + 1, 2));
+  const prevStep = () => setStep(prev => Math.max(prev - 1, 0));
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (step < 2) {
+      nextStep();
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      // Get the current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error(userError?.message || 'User not authenticated');
       }
-      // TODO: Persist onboarding data to backend (Supabase)
-      // TODO: Set hasCompletedOnboarding flag via server action
-      setCompleted(true);
-      // Redirect to dashboard after short delay
-      setTimeout(() => {
-        router.replace('/home');
-      }, 1200);
+
+      // Update the user's account to mark onboarding as complete
+      const { error: updateError } = await supabase
+        .from('accounts')
+        .update({
+          public_data: {
+            has_completed_onboarding: true,
+            ...formData
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('primary_owner_user_id', user.id)
+        .eq('is_personal_account', true);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Redirect to home after successful submission
+      window.location.href = '/home';
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      setIsSubmitting(false);
     }
   };
 
-  // UI for each step
-  function StepFields() {
-    switch (step) {
-      case 0:
-        return (
-          <>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="First Name" {...methods.register('firstName')} autoFocus />
-              <Input label="Last Name" {...methods.register('lastName')} />
-            </div>
-            <Input label="Company (optional)" {...methods.register('company')} className="mt-4" />
-            {/* Profile picture uploader could go here */}
-          </>
-        );
-      case 1:
-        return (
-          <>
-            <Input label="Property Type" {...methods.register('propertyType')} autoFocus />
-            <Input label="State" {...methods.register('state')} className="mt-4" />
-            <Input label="Timezone (optional)" {...methods.register('timezone')} className="mt-4" />
-          </>
-        );
-      case 2:
-        return (
-          <>
-            <Input label="RP Data API Key (optional)" {...methods.register('rpDataApiKey')} autoFocus />
-            <Input label="Canva API Key (optional)" {...methods.register('canvaApiKey')} className="mt-4" />
-          </>
-        );
-      default:
-        return null;
-    }
-  }
-
-  if (completed) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background">
-        <AppLogo className="mb-6" />
-        <Card className="w-full max-w-md shadow-xl animate-in fade-in zoom-in duration-700">
-          <CardHeader>
-            <CardTitle className="text-center text-primary">Welcome to MarketReady.ai!</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center gap-2">
-              <Heading level={4} className="text-success">Onboarding Complete</Heading>
-              <p className="text-muted-foreground text-center">
-                You’ll be redirected to your dashboard in a moment.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background">
-      <AppLogo className="mb-6" />
-      <Card className="w-full max-w-md shadow-xl animate-in fade-in zoom-in duration-700">
+    <div className="flex items-center justify-center min-h-screen bg-background p-4">
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-center text-primary">
-            <Trans i18nKey="onboarding:title" defaults="Get Started with MarketReady.ai" />
+          <CardTitle className="text-center">
+            {step === 0 ? 'Personal Information' : 
+             step === 1 ? 'Business Information' : 'Review'}
           </CardTitle>
-          <Progress value={((step + 1) / totalSteps) * 100} className="mt-4" />
-          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-            {steps.map((s, i) => (
-              <span key={s.label} className={cn(i === step && 'font-bold text-primary')}>
-                {s.label}
-              </span>
-            ))}
+          <div className="flex justify-between mt-2 text-sm text-muted-foreground">
+            <span>Step {step + 1} of 3</span>
+            <span>{Math.round(((step + 1) / 3) * 100)}% Complete</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+            <div 
+              className="bg-primary h-2.5 rounded-full transition-all duration-300" 
+              style={{ width: `${((step + 1) / 3) * 100}%` }}
+            />
           </div>
         </CardHeader>
         <CardContent>
-          <FormProvider {...methods}>
-            <form
-              className="flex flex-col gap-6"
-              onSubmit={methods.handleSubmit(onSubmit)}
-              autoComplete="off"
-            >
-              <StepFields />
-              <div className="flex justify-between mt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={step === 0}
-                  onClick={() => setStep((s) => Math.max(0, s - 1))}
-                >
-                  Back
-                </Button>
-                <Button type="submit" variant="brand">
-                  {step === totalSteps - 1 ? 'Finish' : 'Next'}
-                </Button>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {step === 0 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="company">Company (Optional)</Label>
+                  <Input
+                    id="company"
+                    name="company"
+                    value={formData.company}
+                    onChange={handleChange}
+                    className="mt-1"
+                  />
+                </div>
               </div>
-            </form>
-          </FormProvider>
+            )}
+            
+            {step === 1 && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="propertyType">Property Type</Label>
+                  <Input
+                    id="propertyType"
+                    name="propertyType"
+                    value={formData.propertyType}
+                    onChange={handleChange}
+                    required
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    name="state"
+                    value={formData.state}
+                    onChange={handleChange}
+                    required
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="timezone">Timezone (Optional)</Label>
+                  <Input
+                    id="timezone"
+                    name="timezone"
+                    value={formData.timezone}
+                    onChange={handleChange}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="rpDataApiKey">RP Data API Key (Optional)</Label>
+                  <Input
+                    id="rpDataApiKey"
+                    name="rpDataApiKey"
+                    type="password"
+                    value={formData.rpDataApiKey}
+                    onChange={handleChange}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="canvaApiKey">Canva API Key (Optional)</Label>
+                  <Input
+                    id="canvaApiKey"
+                    name="canvaApiKey"
+                    type="password"
+                    value={formData.canvaApiKey}
+                    onChange={handleChange}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={prevStep}
+                disabled={step === 0}
+              >
+                Back
+              </Button>
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={
+                  isSubmitting || 
+                  step === 0 || 
+                  (step === 1 && (!formData.firstName || !formData.lastName))
+                }
+              >
+                {isSubmitting ? 'Saving...' : step === 2 ? 'Complete Setup' : 'Next'}
+              </Button>
+              {error && (
+                <p className="text-sm text-red-500 mt-2 text-center">
+                  {error}
+                </p>
+              )}
+            </div>
+          </form>
         </CardContent>
       </Card>
     </div>
