@@ -62,41 +62,48 @@ function getPaths() {
 }
 
 async function getContentItems() {
-  const client = await createCmsClient();
+  try {
+    const client = await createCmsClient();
+    const limit = Infinity;
 
-  // do not paginate the content items
-  const limit = Infinity;
-  const posts = client
-    .getContentItems({
-      collection: 'posts',
-      content: false,
-      limit,
-    })
-    .then((response) => response.items)
-    .then((posts) =>
-      posts.map((post) => ({
-        loc: new URL(`/blog/${post.slug}`, appConfig.url).href,
-        lastmod: post.publishedAt
-          ? new Date(post.publishedAt).toISOString()
-          : new Date().toISOString(),
-      })),
-    );
+    const postsPromise = client
+      .getContentItems({
+        collection: 'posts',
+        content: false,
+        limit,
+      })
+      .then((response) => response.items)
+      .then((posts) =>
+        posts.map((post) => ({
+          loc: new URL(`/blog/${post.slug}`, appConfig.url).href,
+          lastmod: post.publishedAt
+            ? new Date(post.publishedAt).toISOString()
+            : new Date().toISOString(),
+        })),
+      );
 
-  const docs = client
-    .getContentItems({
-      collection: 'documentation',
-      content: false,
-      limit,
-    })
-    .then((response) => response.items)
-    .then((docs) =>
-      docs.map((doc) => ({
-        loc: new URL(`/docs/${doc.slug}`, appConfig.url).href,
-        lastmod: doc.publishedAt
-          ? new Date(doc.publishedAt).toISOString()
-          : new Date().toISOString(),
-      })),
-    );
+    const docsPromise = client
+      .getContentItems({
+        collection: 'documentation',
+        content: false,
+        limit,
+      })
+      .then((response) => response.items)
+      .then((docs) =>
+        docs.map((doc) => ({
+          loc: new URL(`/docs/${doc.slug}`, appConfig.url).href,
+          lastmod: doc.publishedAt
+            ? new Date(doc.publishedAt).toISOString()
+            : new Date().toISOString(),
+        })),
+      );
 
-  return Promise.all([posts, docs]).then((items) => items.flat());
+    const [posts, docs] = await Promise.all([postsPromise, docsPromise]);
+
+    return [...posts, ...docs];
+  } catch (error) {
+    console.error('Failed to fetch content items for sitemap:', error);
+
+    return [];
+  }
 }
