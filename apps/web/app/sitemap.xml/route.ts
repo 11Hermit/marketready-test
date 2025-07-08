@@ -14,14 +14,29 @@ const MAX_AGE = 60;
 const S_MAX_AGE = 3600;
 
 export async function GET() {
-  const paths = getPaths();
-  const contentItems = await getContentItems();
+  try {
+    const paths = getPaths();
+    const contentItems = await getContentItems();
 
-  const headers = {
-    'Cache-Control': `public, max-age=${MAX_AGE}, s-maxage=${S_MAX_AGE}`,
-  };
+    const headers = {
+      'Cache-Control': `public, max-age=${MAX_AGE}, s-maxage=${S_MAX_AGE}`,
+    };
 
-  return getServerSideSitemap([...paths, ...contentItems], headers);
+    return getServerSideSitemap([...paths, ...contentItems], headers);
+  } catch (error) {
+    console.error('Sitemap generation failed:', error);
+    // Return a minimal valid sitemap so build never fails
+    return new Response(
+      `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>`,
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/xml',
+          'Cache-Control': `public, max-age=${MAX_AGE}, s-maxage=${S_MAX_AGE}`,
+        },
+      }
+    );
+  }
 }
 
 function getPaths() {

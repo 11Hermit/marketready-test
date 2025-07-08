@@ -1,343 +1,266 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, FormProvider, useFormContext } from 'react-hook-form';
-import { z } from 'zod';
-import { Button } from '@kit/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@kit/ui/card';
-import { Input } from '@kit/ui/input';
-import { Label } from '@kit/ui/label';
-// Simple class name utility function
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useForm, FormProvider, useFormContext } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { UserResponse, User } from "@supabase/supabase-js";
+import { getSupabaseBrowserClient } from "../../lib/get-supabase-browser-client";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
+import { Input } from "@kit/ui/input";
+import { Label } from "@kit/ui/label";
+import { Button } from "@kit/ui/button";
+
 function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ');
+  return classes.filter(Boolean).join(" ");
 }
 
-// Form Schemas
-const personalInfoSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  company: z.string().optional(),
+const PROPERTY_TYPES = [
+  "Residential",
+  "Office",
+  "Retail",
+  "Industrial & Logistics",
+  "Hotel / Hospitality",
+  "Land / Rural",
+  "Other",
+] as const;
+
+const STATES = [
+  "QLD",
+  "NSW",
+  "VIC",
+  "SA",
+  "WA",
+  "TAS",
+  "ACT",
+  "NT",
+] as const;
+
+const step1Schema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  agency: z.string().min(1, "Agency / Company name is required"),
+  profilePicture: z.any().optional(),
 });
 
-const businessInfoSchema = z.object({
-  propertyType: z.string().min(1, 'Property type is required'),
-  state: z.string().min(1, 'State is required'),
+const step2Schema = z.object({
+  propertyType: z.enum(PROPERTY_TYPES, { required_error: "Property type is required" }),
+  state: z.enum(STATES, { required_error: "State is required" }),
   timezone: z.string().optional(),
 });
 
-const integrationsSchema = z.object({
-  rpDataApiKey: z.string().optional(),
-  canvaApiKey: z.string().optional(),
-});
+const formSchema = step1Schema.merge(step2Schema);
 
-const formSchema = personalInfoSchema.merge(businessInfoSchema).merge(integrationsSchema);
+type FormValues = z.infer<typeof formSchema>;
 
-type FormData = z.infer<typeof formSchema>;
+interface StepConfig {
+  title: string;
+  fields: (keyof FormValues)[];
+  schema: z.ZodTypeAny;
+}
 
-// Form Steps
-const steps = [
+const steps: StepConfig[] = [
   {
-    title: 'Personal Information',
-    fields: ['firstName', 'lastName', 'company'],
-    schema: personalInfoSchema,
+    title: "Tell us about you",
+    fields: ["firstName", "lastName", "agency", "profilePicture"],
+    schema: step1Schema,
   },
   {
-    title: 'Business Information',
-    fields: ['propertyType', 'state', 'timezone'],
-    schema: businessInfoSchema,
-  },
-  {
-    title: 'Integrations',
-    fields: ['rpDataApiKey', 'canvaApiKey'],
-    schema: integrationsSchema,
+    title: "Role & Preferences",
+    fields: ["propertyType", "state", "timezone"],
+    schema: step2Schema,
   },
 ];
 
-// Input Component
-const FormInput = ({ 
-  name, 
-  label, 
-  type = 'text', 
-  ...props 
-}: { 
-  name: string; 
-  label: string; 
-  type?: string;
-} & React.InputHTMLAttributes<HTMLInputElement>) => {
-  const { register, formState: { errors } } = useFormContext<FormData>();
-  const error = errors[name as keyof FormData]?.message as string;
-
+const TextInput: React.FC<{ name: keyof FormValues; label: string; type?: string; autoFocus?: boolean }> = ({ name, label, type = "text", autoFocus = false }) => {
+  const { register, formState: { errors } } = useFormContext<FormValues>();
+  const error = errors[name]?.message as string | undefined;
   return (
     <div className="space-y-2">
-      <Label htmlFor={name}>{label}</Label>
-      <Input
-        id={name}
-        type={type}
-        {...props}
-        {...register(name as keyof FormData)}
-        className={cn(error && 'border-destructive')}
-      />
+      <Label htmlFor={name as string}>{label}</Label>
+      <Input id={name as string} type={type} autoFocus={autoFocus} className={cn(error && "border-destructive")} {...register(name)} />
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 };
 
-// Step Component
-const StepForm = ({ 
-  step, 
-  onNext, 
-  onBack, 
-  isLastStep 
-}: { 
-  step: number; 
-  onNext: () => void; 
-  onBack: () => void; 
-  isLastStep: boolean;
-}) => {
-  const { handleSubmit, formState: { isSubmitting } } = useFormContext<FormData>();
-  
+const SelectInput: React.FC<{ name: keyof FormValues; label: string; options: readonly string[]; autoFocus?: boolean }> = ({ name, label, options, autoFocus = false }) => {
+  const { register, formState: { errors } } = useFormContext<FormValues>();
+  const error = errors[name]?.message as string | undefined;
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <div className="space-y-4">
-        {step === 0 && (
-          <>
-            <div className="grid grid-cols-2 gap-4">
-              <FormInput
-                name="firstName"
-                label="First Name"
-                autoFocus
-              />
-              <FormInput
-                name="lastName"
-                label="Last Name"
-              />
-            </div>
-            <FormInput
-              name="company"
-              label="Company (Optional)"
-            />
-          </>
-        )}
-
-        {step === 1 && (
-          <>
-            <FormInput
-              name="propertyType"
-              label="Property Type"
-              autoFocus
-            />
-            <FormInput
-              name="state"
-              label="State"
-            />
-            <FormInput
-              name="timezone"
-              label="Timezone (Optional)"
-            />
-          </>
-        )}
-
-        {step === 2 && (
-          <>
-            <FormInput
-              name="rpDataApiKey"
-              label="RP Data API Key (Optional)"
-              type="password"
-              autoFocus
-            />
-            <FormInput
-              name="canvaApiKey"
-              label="Canva API Key (Optional)"
-              type="password"
-            />
-          </>
-        )}
-      </div>
-      
-      <div className="flex justify-between">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onBack}
-          disabled={step === 0}
-        >
-          Back
-        </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isLastStep ? 'Finish' : 'Next'}
-        </Button>
-      </div>
-    </form>
+    <div className="space-y-2">
+      <Label htmlFor={name as string}>{label}</Label>
+      <select id={name as string} className={cn("mt-1 block w-full rounded-md border bg-background p-2 text-sm shadow-sm focus:border-primary focus:outline-none", error && "border-destructive")} {...register(name)} autoFocus={autoFocus}>
+        <option value="" disabled>Select...</option>
+        {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+      </select>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
   );
 };
 
-// Main Component
+const FileInput: React.FC<{ name: keyof FormValues; label: string }> = ({ name, label }) => {
+  const { register } = useFormContext<FormValues>();
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={name as string}>{label}</Label>
+      <input id={name as string} type="file" accept="image/*" {...register(name)} className="mt-1 block w-full text-sm" />
+    </div>
+  );
+};
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
-  const [isCompleted, setIsCompleted] = useState(false);
   const totalSteps = steps.length;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const supabase = getSupabaseBrowserClient();
 
-  const methods = useForm<FormData>({
-    resolver: zodResolver(steps[currentStep].schema as any),
-    mode: 'onChange',
+  const methods = useForm<FormValues>({
+    resolver: zodResolver(formSchema), // Use the full schema
+    mode: "onChange",
   });
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) router.replace("/auth/sign-in");
+    })();
+  }, [supabase, router]);
 
   const { handleSubmit, trigger } = methods;
 
-  const onNext = async () => {
-    const isValid = await trigger(steps[currentStep].fields as any);
-    if (!isValid) return;
-    
-    if (currentStep < totalSteps - 1) {
-      setCurrentStep((prev) => prev + 1);
-    } else {
-      // Handle final submission
-      setIsCompleted(true);
-      // Redirect to dashboard after a short delay
-      setTimeout(() => {
-        router.push('/home');
-      }, 2000);
+  const handleNextStep = async () => {
+    const fields = steps[currentStep]?.fields;
+    if (!fields) return;
+
+    const isValid = await trigger(fields);
+    if (isValid && currentStep < totalSteps - 1) {
+      setCurrentStep(currentStep + 1);
     }
   };
 
-  const onBack = () => {
-    setCurrentStep((prev) => Math.max(0, prev - 1));
+  const handlePrevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
   };
 
-  const onSubmit = async (data: FormData) => {
-    console.log('Form submitted:', data);
-    // TODO: Save data to backend
-    await onNext();
+  const onSubmit = async (data: FormValues) => {
+    // This function is now only for the final submission
+    setIsSubmitting(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !user.email) throw new Error("User not authenticated");
+
+      let avatarUrl: string | undefined;
+      const profilePicture = data.profilePicture as unknown as FileList | undefined;
+      const pic = profilePicture?.[0];
+
+      if (pic) {
+        const filePath = `${user.id}/${Date.now()}-${pic.name}`;
+        const { error: uploadError } = await supabase.storage.from('profile_pictures').upload(filePath, pic, { upsert: true, contentType: pic.type });
+        if (uploadError) {
+          console.error('Upload error:', uploadError.message);
+        } else {
+          const { data: publicUrlData } = supabase.storage.from('profile_pictures').getPublicUrl(filePath);
+          avatarUrl = publicUrlData?.publicUrl;
+        }
+      }
+
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id: user.id,
+        email: user.email,
+        username: user.user_metadata?.username || user.email.split('@')[0],
+        first_name: data.firstName,
+        last_name: data.lastName,
+        agency: data.agency,
+        property_type: data.propertyType,
+        state: data.state,
+        timezone: data.timezone,
+        profile_picture_url: avatarUrl,
+        hascompletedonboarding: true,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+      if (profileError) throw profileError;
+
+      setCompleted(true);
+      setTimeout(() => router.push("/home"), 1500);
+    } catch (err) {
+      console.error("Onboarding error:", err);
+      alert("An error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (isCompleted) {
+  if (completed) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background p-4">
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md text-center p-8">
-          <div className="rounded-full bg-green-100 p-4 w-20 h-20 flex items-center justify-center mx-auto mb-6">
-            <svg
-              className="w-12 h-12 text-green-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">
-            Setup Complete!
-          </h2>
-          <p className="text-muted-foreground mb-6">
-            Your account is ready. Redirecting you to the dashboard...
-          </p>
+          <h2 className="text-2xl font-bold mb-2">Setup complete!</h2>
+          <p className="text-muted-foreground">Redirecting you to your dashboard…</p>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center">
-            {steps[currentStep].title}
-          </CardTitle>
-          <div className="flex justify-between mt-2 text-sm text-muted-foreground">
-            <span>Step {currentStep + 1} of {totalSteps}</span>
-            <span>{Math.round(((currentStep + 1) / totalSteps) * 100)}% Complete</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
-            <div 
-              className="bg-primary h-2.5 rounded-full transition-all duration-300" 
-              style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <FormProvider {...methods}>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              <div className="space-y-4">
+    <div className="min-h-screen flex flex-col md:flex-row">
+      <div className="hidden md:flex md:w-1/2 bg-muted items-center justify-center p-8">
+        <h1 className="text-3xl font-semibold max-w-sm text-center">
+          Let’s get you set up — this helps us personalise your experience and recommend the most relevant tools for your work.
+        </h1>
+      </div>
+      <div className="flex w-full md:w-1/2 items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center">{steps[currentStep]?.title ?? 'Onboarding Step'}</CardTitle>
+            <div className="flex justify-between mt-2 text-sm text-muted-foreground">
+              <span>Step {currentStep + 1} of {totalSteps}</span>
+              <span>{Math.round(((currentStep + 1) / totalSteps) * 100)}% Complete</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+              <div className="bg-primary h-2.5 rounded-full transition-all duration-300" style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }} />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <FormProvider {...methods}>
+              <form className="space-y-6">
                 {currentStep === 0 && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormInput
-                        name="firstName"
-                        label="First Name"
-                        autoFocus
-                      />
-                      <FormInput
-                        name="lastName"
-                        label="Last Name"
-                      />
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <TextInput name="firstName" label="First Name" autoFocus />
+                      <TextInput name="lastName" label="Last Name" />
                     </div>
-                    <FormInput
-                      name="company"
-                      label="Company (Optional)"
-                    />
-                  </>
+                    <TextInput name="agency" label="Agency / Company Name" />
+                    <FileInput name="profilePicture" label="Profile Picture (optional)" />
+                  </div>
                 )}
-
                 {currentStep === 1 && (
-                  <>
-                    <FormInput
-                      name="propertyType"
-                      label="Property Type"
-                      autoFocus
-                    />
-                    <FormInput
-                      name="state"
-                      label="State"
-                    />
-                    <FormInput
-                      name="timezone"
-                      label="Timezone (Optional)"
-                    />
-                  </>
+                  <div className="space-y-4">
+                    <SelectInput name="propertyType" label="Property Type" options={PROPERTY_TYPES} autoFocus />
+                    <SelectInput name="state" label="State" options={STATES} />
+                    <TextInput name="timezone" label="Timezone (optional)" />
+                  </div>
                 )}
-
-                {currentStep === 2 && (
-                  <>
-                    <FormInput
-                      name="rpDataApiKey"
-                      label="RP Data API Key (Optional)"
-                      type="password"
-                      autoFocus
-                    />
-                    <FormInput
-                      name="canvaApiKey"
-                      label="Canva API Key (Optional)"
-                      type="password"
-                    />
-                  </>
-                )}
-              </div>
-              
-              <div className="flex justify-between">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onBack}
-                  disabled={currentStep === 0}
-                >
-                  Back
-                </Button>
-                <Button type="submit">
-                  {currentStep === totalSteps - 1 ? 'Finish' : 'Next'}
-                </Button>
-              </div>
-            </form>
-          </FormProvider>
-        </CardContent>
-      </Card>
+                <div className="flex justify-between">
+                  <Button type="button" variant="outline" onClick={handlePrevStep} disabled={currentStep === 0 || isSubmitting}>Back</Button>
+                  {currentStep === totalSteps - 1 ? (
+                    <Button type="button" onClick={handleSubmit(onSubmit)} disabled={isSubmitting}>{isSubmitting ? "Finishing…" : "Finish"}</Button>
+                  ) : (
+                    <Button type="button" onClick={handleNextStep}>Next</Button>
+                  )}
+                </div>
+              </form>
+            </FormProvider>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
