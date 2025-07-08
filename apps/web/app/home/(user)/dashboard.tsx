@@ -4,7 +4,7 @@
 import { useUserWorkspace } from '@kit/accounts/hooks/use-user-workspace';
 import { Heading } from '@kit/ui/heading';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@kit/ui/card';
-import { cn } from '../../../../lib/utils';
+import { cn } from '@/lib/utils';
 import { Button } from '@kit/ui/button';
 import { 
   LucideSparkles, 
